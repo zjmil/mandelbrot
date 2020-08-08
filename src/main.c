@@ -1,15 +1,21 @@
 
 #include <stdio.h>
+#include <dlfcn.h>
 #include <allegro5/allegro.h>
 
 #include "log.h"
 
 const float FPS = 60.0;
 
+
 int main(int argc, char **argv)
 {
-    log_init(stderr, LOG_INFO);
-    
+    Logger logger = {
+        .stream = stderr,
+        .level = LOG_INFO
+    };
+    set_logger(&logger);
+
     if (!al_init()) {
         ERROR("Failed to init allegro");
         return EXIT_FAILURE;
@@ -46,6 +52,7 @@ int main(int argc, char **argv)
     bool running = true;
 
     INFO("Starting main game loop...");
+
     while (running) {
         ALLEGRO_TIMEOUT timeout;
         al_init_timeout(&timeout, 0.06);

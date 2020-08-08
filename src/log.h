@@ -3,17 +3,22 @@
 
 #include <stdio.h>
 
-enum log_level {
+typedef enum {
     LOG_DEBUG = 0,
     LOG_INFO = 1,
     LOG_WARN = 2,
     LOG_ERROR = 3
-};
+} LogLevel;
+
+typedef struct {
+    FILE *stream;
+    LogLevel level;
+} Logger;
 
 
-void log_init(FILE *file, enum log_level level);
+Logger *set_logger(Logger *logger);
 
-void LOG(enum log_level level, const char *fmt, ...);
+void LOG(LogLevel level, const char *fmt, ...);
 
 #define DEBUG(fmt, ...)     LOG(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define INFO(fmt, ...)      LOG(LOG_INFO,  fmt, ##__VA_ARGS__)

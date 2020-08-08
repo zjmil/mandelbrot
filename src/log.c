@@ -4,19 +4,11 @@
 
 #include "log.h"
 
-static enum log_level LOG_LEVEL = LOG_INFO;
-static FILE *LOG_FILE = NULL;
 
-void log_init(FILE *file, enum log_level level)
-{
-    if (!file) {
-        file = stderr;
-    }
-    LOG_FILE = file;
-    LOG_LEVEL = level;
-}
+static Logger *LOGGER = NULL;
+static Logger DEFAULT_LOGGER;
 
-static const char *level_str(enum log_level level)
+static const char *level_str(LogLevel level)
 {
     switch (level) {
         case LOG_DEBUG:
@@ -32,24 +24,46 @@ static const char *level_str(enum log_level level)
     }
 }
 
-void LOG(enum log_level level, const char *fmt, ...)
+static void current_timestamp(char *buf, size_t maxsize)
 {
-    if (level < LOG_LEVEL) {
+    time_t ltime = time(NULL);
+    struct tm tm;
+    localtime_r(&ltime, &tm);
+    strftime(buf, maxsize, "%Y-%m-%dT%H:%M:%S%z", &tm);
+}
+
+static void set_default_logger()
+{
+    DEFAULT_LOGGER.stream = stderr;
+    DEFAULT_LOGGER.level = LOG_INFO;
+}
+
+Logger *set_logger(Logger *logger)
+{
+    Logger *prev = LOGGER;
+    LOGGER = logger;
+    return prev;
+}
+
+void LOG(LogLevel level, const char *fmt, ...)
+{
+    if (LOGGER == NULL) {
+        set_default_logger();
+        LOGGER = &DEFAULT_LOGGER;
+    }
+
+    if (level < LOGGER->level) {
         return;
     }
 
     va_list args;
     va_start(args, fmt);
 
-    /* get timestamp */
-    time_t ltime = time(NULL);
-    struct tm tm;
-    char stime[128];
-    localtime_r(&ltime, &tm);
-    strftime(stime, sizeof(stime), "%Y-%m-%dT%H:%M:%S%z", &tm);
+    char ts[128];
+    current_timestamp(ts, sizeof(ts));
 
-    fprintf(LOG_FILE, "%s %s: ", stime, level_str(level));
-    vfprintf(LOG_FILE, fmt, args);
-    fprintf(LOG_FILE, "\n");
+    fprintf(LOGGER->stream, "%s %s: ", ts, level_str(level));
+    vfprintf(LOGGER->stream, fmt, args);
+    fprintf(LOGGER->stream, "\n");
     va_end(args);
 }

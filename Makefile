@@ -1,21 +1,23 @@
-CC := gcc
+CC := clang
 CFLAGS := -g -Wall
 LIBS := -lallegro -lallegro_main
-SOURCES := $(shell find src -type f -name "*.c")
-OBJECTS := $(SOURCES:.c=.o)
-TARGET_DIR := target
-TARGET := $(TARGET_DIR)/game
 
-all: $(SOURCES) $(TARGET)
+SRC_DIR := src
+TARGET := game
+ 
+SOURCES := $(shell find $(SRC_DIR) -type f -name "*.c")
+OBJECTS := $(SOURCES:.c=.o)
+
+
+all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	mkdir -p $(TARGET_DIR)
-	@echo " Linking..."; $(CC) $^ -o $@ $(LIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
-%.o: %.c
-	@echo " CC $<"; $(CC) $(CFLAGS) -c -o $@ $<
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $^ -o $@ $(LIBS)
 
 clean:
-	@echo " Cleaning..."; $(RM) src/*.o $(TARGET)
+	$(RM) -r $(TARGET_DIR) $(shell find . -type f -name "*.o")
 
 .PHONY: all clean
