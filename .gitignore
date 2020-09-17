@@ -1,3 +1,4 @@
-*.o
-target/
-game
+build/
+.vscode/
+.idea
+cmake-build-debug
