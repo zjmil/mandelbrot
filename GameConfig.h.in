@@ -1,4 +1,0 @@
-
-#define Game_VERSION_MAJOR @Game_VERSION_MAJOR@
-#define Game_VERSION_MINOR @Game_VERSION_MINOR@
-#define Game_NAME "Mandelbrot"
