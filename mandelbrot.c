@@ -59,6 +59,38 @@ void mandelbrot_init_default(Mandelbrot *m)
     m->max_periods = 20;
 }
 
+int mandelbrot_iterations(Mandelbrot *m, float x0, float y0)
+{
+    float x = 0.0, y = 0.0, x2 = 0.0, y2 = 0.0;
+    int iterations = 0;
+
+    float xold = 0.0, yold = 0.0;
+    int period = 0;
+
+    while ((x2 + y2) <= 4.0 && iterations < m->max_iterations) {
+        y = 2*x*y + y0;
+        x = x2 - y2 + x0;
+        x2 = x*x;
+        y2 = y*y;
+
+        iterations += 1;
+
+        if (approx(x, xold) && approx(y, yold)) {
+            iterations = m->max_iterations;
+            break;
+        }
+
+        period += 1;
+        if (period > m->max_periods) {
+            period = 0;
+            xold = x;
+            yold = y;
+        }
+    }
+
+    return iterations;
+}
+
 void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors, Mandelbrot *m)
 {
     float xdelta = bounds_xrange(&m->bounds) / width;
@@ -70,39 +102,13 @@ void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color 
         for (int px = 0; px < width; px++) {
             float x0 = m->bounds.x0 + px * xdelta;
 
-            float x = 0.0, y = 0.0, x2 = 0.0, y2 = 0.0;
-            int iteration = 0;
+            int iterations = mandelbrot_iterations(m, x0, y0);
 
-            float xold = 0.0, yold = 0.0;
-            int period = 0;
-
-            while ((x2 + y2) <= 4.0 && iteration < m->max_iterations) {
-                y = 2*x*y + y0;
-                x = x2 - y2 + x0;
-                x2 = x*x;
-                y2 = y*y;
-
-                iteration += 1;
-
-                if (approx(x, xold) && approx(y, yold)) {
-                    iteration = m->max_iterations;
-                    break;
-                }
-
-                period += 1;
-                if (period > m->max_periods) {
-                    period = 0;
-                    xold = x;
-                    yold = y;
-                }
-            }
-
-            SDL_Color c = colors[iteration % ncolors];
+            SDL_Color c = colors[iterations % ncolors];
             pixelRGBA(renderer, px, py, c.r, c.g, c.b, 0xff);
         }
     }
 }
-
 
 int main(void)
 {
