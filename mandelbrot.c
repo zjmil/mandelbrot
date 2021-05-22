@@ -26,19 +26,16 @@ bool approx(float a, float b)
     return fabsf(a - b) < 1.0e-7;
 }
 
-typedef struct Bounds {
-    float x0, x1;
-    float y0, y1;
-} Bounds;
+typedef struct Graph {
+    float centerx, centery;
+    float scale;
+} Graph;
 
-float bounds_xrange(Bounds *b)
+void graph_init_default(Graph *g)
 {
-    return b->x1 - b->x0;
-}
-
-float bounds_yrange(Bounds *b)
-{
-    return b->y1 - b->y0;
+    g->centerx = 0.0f;
+    g->centery = 0.0f;
+    g->scale = 1.0f / 400.0f;
 }
 
 typedef struct Mandelbrot {
@@ -84,16 +81,19 @@ int mandelbrot_iterations(Mandelbrot *m, float x0, float y0)
     return iterations;
 }
 
-void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors, Mandelbrot *m, Bounds *bounds)
+void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, Mandelbrot *m, Graph *g)
 {
-    float xdelta = bounds_xrange(bounds) / width;
-    float ydelta = bounds_yrange(bounds) / height;
+    int width = 0, height = 0;
+    SDL_GetRendererOutputSize(renderer, &width, &height);
+
+    float tx = g->centerx - (g->scale * width) / 2.0f;
+    float ty = g->centery + (g->scale * height) / 2.0f;
 
     for (int py = 0; py < height; py++) {
-        float y0 = bounds->y0 + py * ydelta;
+        float y0 = ty - py * g->scale;
 
         for (int px = 0; px < width; px++) {
-            float x0 = bounds->x0 + px * xdelta;
+            float x0 = tx + px * g->scale;
 
             int iterations = mandelbrot_iterations(m, x0, y0);
 
@@ -115,7 +115,7 @@ int main(void)
             "Mandelbrot",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             width, height,
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
     );
     if (!window) {
         fatal("Failed to create window: %s", SDL_GetError());
@@ -147,20 +147,15 @@ int main(void)
     Mandelbrot m;
     mandelbrot_init_default(&m);
 
-    Bounds bounds = {
-        .x0 = -2.5,
-        .x1 = 1.0,
-        .y0 = -1.0,
-        .y1 = 1.0
-    };
-
+    Graph graph;
+    graph_init_default(&graph);
 
     // clear the screen
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
     // TODO: future add movement and respond to window size changes, rerender accordingly
-    render_mandelbrot(renderer, width, height, colors, ncolors, &m, &bounds);
+    render_mandelbrot(renderer, colors, ncolors, &m, &graph);
 
     // show
     SDL_RenderPresent(renderer);
