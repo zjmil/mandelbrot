@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include <SDL.h>
+#include <SDL2_gfxPrimitives.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -25,7 +26,7 @@ bool approx(float a, float b)
     return fabsf(a - b) < 1.0e-7;
 }
 
-void calc_iterations(SDL_Color *pixels, int width, int height, SDL_Color *colors, int ncolors)
+void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors)
 {
     int max_iterations = 1000, max_periods = 20;
     float xmin = -2.5, xmax = 1.0, ymin = -1.0, ymax = 1.0;
@@ -66,14 +67,14 @@ void calc_iterations(SDL_Color *pixels, int width, int height, SDL_Color *colors
                 }
             }
 
-            int pidx = py * width + px;
-            pixels[pidx] = colors[iteration % ncolors];
+            SDL_Color c = colors[iteration % ncolors];
+            pixelRGBA(renderer, px, py, c.r, c.g, c.b, 0xff);
         }
     }
 }
 
 
-int main(int argc, char *argv[])
+int main(void)
 {
     int width = 700, height = 400;
 
@@ -96,16 +97,6 @@ int main(int argc, char *argv[])
         fatal("Failed to create renderer: %s", SDL_GetError());
     }
 
-    SDL_Texture *texture = SDL_CreateTexture(
-        renderer,
-        SDL_PIXELFORMAT_ABGR8888,
-        SDL_TEXTUREACCESS_STREAMING,
-        width, height
-    );
-    if (!texture) {
-        fatal("Failed to create texture: %s", SDL_GetError());
-    }
-
     SDL_Color colors[] = {{66, 30, 15, 255},
                           {25, 7, 26, 255},
                           {9, 1, 47, 255},
@@ -124,19 +115,14 @@ int main(int argc, char *argv[])
                           {106, 52, 3, 255}};
     size_t ncolors = ARRAY_SIZE(colors);
 
-    SDL_Color *pixels = calloc(sizeof(*pixels), width * height);
-
     // clear the screen
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
     // TODO: future add movement and respond to window size changes, rerender accordingly
-    calc_iterations(pixels, width, height, colors, ncolors);
+    render_mandelbrot(renderer, width, height, colors, ncolors);
 
-    // render the set
-    SDL_UpdateTexture(texture, NULL, pixels, width * 4);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
-
+    // show
     SDL_RenderPresent(renderer);
 
     SDL_Event event;
@@ -164,11 +150,8 @@ int main(int argc, char *argv[])
         SDL_Delay(sleep_ms);
     }
 
-    SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-
-    free(pixels);
 
     SDL_Quit();
     return EXIT_SUCCESS;

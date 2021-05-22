@@ -7,9 +7,9 @@ renderer. It uses [SDL2](https://www.libsdl.org) for rendering.
 ### Building
 All that's needed to build is SDL2 and a C compiler.
 
-SDL2 can be installed on macOS with Homebrew:
+SDL2 and SDL2_gfx can be installed on macOS with Homebrew:
 ```bash
-brew install sdl2
+brew install sdl2 sdl2_gfx
 
 ```
 
