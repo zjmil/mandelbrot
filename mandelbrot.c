@@ -42,19 +42,12 @@ float bounds_yrange(Bounds *b)
 }
 
 typedef struct Mandelbrot {
-    Bounds bounds;
     int max_iterations;
     int max_periods;
 } Mandelbrot;
 
 void mandelbrot_init_default(Mandelbrot *m)
 {
-    m->bounds = (Bounds){
-        .x0 = -2.5,
-        .x1 = 1.0,
-        .y0 = -1.0,
-        .y1 = 1.0
-    };
     m->max_iterations = 1000;
     m->max_periods = 20;
 }
@@ -91,16 +84,16 @@ int mandelbrot_iterations(Mandelbrot *m, float x0, float y0)
     return iterations;
 }
 
-void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors, Mandelbrot *m)
+void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors, Mandelbrot *m, Bounds *bounds)
 {
-    float xdelta = bounds_xrange(&m->bounds) / width;
-    float ydelta = bounds_yrange(&m->bounds) / height;
+    float xdelta = bounds_xrange(bounds) / width;
+    float ydelta = bounds_yrange(bounds) / height;
 
     for (int py = 0; py < height; py++) {
-        float y0 = m->bounds.y0 + py * ydelta;
+        float y0 = bounds->y0 + py * ydelta;
 
         for (int px = 0; px < width; px++) {
-            float x0 = m->bounds.x0 + px * xdelta;
+            float x0 = bounds->x0 + px * xdelta;
 
             int iterations = mandelbrot_iterations(m, x0, y0);
 
@@ -154,12 +147,20 @@ int main(void)
     Mandelbrot m;
     mandelbrot_init_default(&m);
 
+    Bounds bounds = {
+        .x0 = -2.5,
+        .x1 = 1.0,
+        .y0 = -1.0,
+        .y1 = 1.0
+    };
+
+
     // clear the screen
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
     // TODO: future add movement and respond to window size changes, rerender accordingly
-    render_mandelbrot(renderer, width, height, colors, ncolors, &m);
+    render_mandelbrot(renderer, width, height, colors, ncolors, &m, &bounds);
 
     // show
     SDL_RenderPresent(renderer);
