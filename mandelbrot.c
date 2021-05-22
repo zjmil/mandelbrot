@@ -26,19 +26,33 @@ bool approx(float a, float b)
     return fabsf(a - b) < 1.0e-7;
 }
 
-void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors)
+typedef struct Bounds {
+    float x0, x1;
+    float y0, y1;
+} Bounds;
+
+float bounds_xrange(Bounds *b)
+{
+    return b->x1 - b->x0;
+}
+
+float bounds_yrange(Bounds *b)
+{
+    return b->y1 - b->y0;
+}
+
+void render_mandelbrot(SDL_Renderer *renderer, int width, int height, SDL_Color *colors, int ncolors, Bounds *bounds)
 {
     int max_iterations = 1000, max_periods = 20;
-    float xmin = -2.5, xmax = 1.0, ymin = -1.0, ymax = 1.0;
 
-    float xrange = xmax - xmin, yrange = ymax - ymin;
-    float xdelta = xrange / width, ydelta = yrange / height;
+    float xdelta = bounds_xrange(bounds) / width;
+    float ydelta = bounds_yrange(bounds) / height;
 
     for (int py = 0; py < height; py++) {
-        float y0 = ymin + py * ydelta;
+        float y0 = bounds->y0 + py * ydelta;
 
         for (int px = 0; px < width; px++) {
-            float x0 = xmin + px * xdelta;
+            float x0 = bounds->x0 + px * xdelta;
 
             float x = 0.0, y = 0.0, x2 = 0.0, y2 = 0.0;
             int iteration = 0;
@@ -114,13 +128,19 @@ int main(void)
                           {153, 87, 0, 255},
                           {106, 52, 3, 255}};
     size_t ncolors = ARRAY_SIZE(colors);
+    Bounds bounds = {
+        .x0 = -2.5,
+        .x1 = 1.0,
+        .y0 = -1.0,
+        .y1 = 1.0
+    };
 
     // clear the screen
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
     // TODO: future add movement and respond to window size changes, rerender accordingly
-    render_mandelbrot(renderer, width, height, colors, ncolors);
+    render_mandelbrot(renderer, width, height, colors, ncolors, &bounds);
 
     // show
     SDL_RenderPresent(renderer);
