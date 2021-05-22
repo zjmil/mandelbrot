@@ -28,7 +28,7 @@ bool approx(float a, float b)
 
 typedef struct Graph {
     float centerx, centery;
-    float scale;
+    float scale; // TODO: add different xscale and yscale for resize events
 } Graph;
 
 void graph_init_default(Graph *g)
@@ -169,14 +169,37 @@ int main(void)
                 case SDLK_q:
                     running = false;
                     break;
+                // scaling
                 case SDLK_EQUALS:
                     if (event.key.keysym.mod & KMOD_SHIFT) {
-                        graph.scale *= 0.1f;
+                        graph.scale *= 0.9f;
                         rerender = true;
                     }
                     break;
                 case SDLK_MINUS:
-                    graph.scale *= 10.0f;
+                    graph.scale *= 10.0f / 9.0f;
+                    rerender = true;
+                    break;
+                // moving
+                case SDLK_UP:
+                    graph.centery += graph.scale * 10.0f;
+                    rerender = true;
+                    break;
+                case SDLK_DOWN:
+                    graph.centery -= graph.scale * 10.0f;
+                    rerender = true;
+                    break;
+                case SDLK_LEFT:
+                    graph.centerx -= graph.scale * 10.0f;
+                    rerender = true;
+                    break;
+                case SDLK_RIGHT:
+                    graph.centery += graph.scale * 10.0f;
+                    rerender = true;
+                    break;
+                // reset
+                case SDLK_r:
+                    graph_init_default(&graph);
                     rerender = true;
                     break;
                 default:
