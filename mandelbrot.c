@@ -154,15 +154,9 @@ int main(void)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
-    // TODO: future add movement and respond to window size changes, rerender accordingly
-    render_mandelbrot(renderer, colors, ncolors, &m, &graph);
-
-    // show
-    SDL_RenderPresent(renderer);
-
     SDL_Event event;
-    uint32_t sleep_ms = 100;
     bool running = true;
+    bool rerender = true;
     while (running) {
         // process events
         while (SDL_PollEvent(&event)) {
@@ -175,6 +169,18 @@ int main(void)
                 case SDLK_q:
                     running = false;
                     break;
+                case SDLK_EQUALS:
+                    if (event.key.keysym.mod & KMOD_SHIFT) {
+                        graph.scale *= 0.1f;
+                        rerender = true;
+                    }
+                    break;
+                case SDLK_MINUS:
+                    graph.scale *= 10.0f;
+                    rerender = true;
+                    break;
+                default:
+                    break;
                 }
                 break;
             default:
@@ -182,7 +188,13 @@ int main(void)
             }
         }
 
-        SDL_Delay(sleep_ms);
+        if (rerender) {
+            rerender = false;
+            render_mandelbrot(renderer, colors, ncolors, &m, &graph);
+
+            // show
+            SDL_RenderPresent(renderer);
+        }
     }
 
     SDL_DestroyRenderer(renderer);
