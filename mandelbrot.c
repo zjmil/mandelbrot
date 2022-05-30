@@ -1,6 +1,5 @@
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
@@ -26,15 +25,19 @@ bool approx(float a, float b)
     return fabsf(a - b) < 1.0e-7;
 }
 
+typedef struct Point2D {
+    float x, y;
+} Point2D;
+
 typedef struct Graph {
-    float centerx, centery;
+    Point2D center;
     float scale; // TODO: add different xscale and yscale for resize events
 } Graph;
 
 void graph_init_default(Graph *g)
 {
-    g->centerx = 0.0f;
-    g->centery = 0.0f;
+    g->center.x = 0.0f;
+    g->center.y = 0.0f;
     g->scale = 1.0f / 400.0f;
 }
 
@@ -49,32 +52,31 @@ void mandelbrot_init_default(Mandelbrot *m)
     m->max_periods = 20;
 }
 
-int mandelbrot_iterations(Mandelbrot *m, float x0, float y0)
+int mandelbrot_iterations(Point2D p0, int max_iterations, int max_periods)
 {
-    float x = 0.0, y = 0.0, x2 = 0.0, y2 = 0.0;
+    float x = 0.0f, y = 0.0f, x2 = 0.0f, y2 = 0.0f;
     int iterations = 0;
 
-    float xold = 0.0, yold = 0.0;
+    Point2D old = {.x = 0.0f, .y = 0.0f};
     int period = 0;
 
-    while ((x2 + y2) <= 4.0 && iterations < m->max_iterations) {
-        y = 2*x*y + y0;
-        x = x2 - y2 + x0;
+    while ((x2 + y2) <= 4.0 && iterations < max_iterations) {
+        y = 2*x*y + p0.y;
+        x = x2 - y2 + p0.x;
         x2 = x*x;
         y2 = y*y;
 
         iterations += 1;
 
-        if (approx(x, xold) && approx(y, yold)) {
-            iterations = m->max_iterations;
+        if (approx(x, old.x) && approx(y, old.y)) {
+            iterations = max_iterations;
             break;
         }
 
         period += 1;
-        if (period > m->max_periods) {
+        if (period > max_periods) {
             period = 0;
-            xold = x;
-            yold = y;
+            old = (Point2D){.x = x, .y = y};
         }
     }
 
@@ -86,16 +88,17 @@ void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, M
     int width = 0, height = 0;
     SDL_GetRendererOutputSize(renderer, &width, &height);
 
-    float tx = g->centerx - (g->scale * width) / 2.0f;
-    float ty = g->centery + (g->scale * height) / 2.0f;
+    float tx = g->center.x - (g->scale * width) / 2.0f;
+    float ty = g->center.y + (g->scale * height) / 2.0f;
 
+    Point2D p0;
     for (int py = 0; py < height; py++) {
-        float y0 = ty - py * g->scale;
+        p0.y = ty - g->scale * py;
 
         for (int px = 0; px < width; px++) {
-            float x0 = tx + px * g->scale;
+            p0.x = tx + g->scale * px;
 
-            int iterations = mandelbrot_iterations(m, x0, y0);
+            int iterations = mandelbrot_iterations(p0, m->max_iterations, m->max_periods);
 
             SDL_Color c = colors[iterations % ncolors];
             pixelRGBA(renderer, px, py, c.r, c.g, c.b, 0xff);
@@ -142,7 +145,6 @@ int main(void)
                           {204, 128, 0, 255},
                           {153, 87, 0, 255},
                           {106, 52, 3, 255}};
-    size_t ncolors = ARRAY_SIZE(colors);
 
     Mandelbrot m;
     mandelbrot_init_default(&m);
@@ -182,19 +184,19 @@ int main(void)
                     break;
                 // moving
                 case SDLK_UP:
-                    graph.centery += graph.scale * 10.0f;
+                    graph.center.y += graph.scale * 10.0f;
                     rerender = true;
                     break;
                 case SDLK_DOWN:
-                    graph.centery -= graph.scale * 10.0f;
+                    graph.center.y -= graph.scale * 10.0f;
                     rerender = true;
                     break;
                 case SDLK_LEFT:
-                    graph.centerx -= graph.scale * 10.0f;
+                    graph.center.x -= graph.scale * 10.0f;
                     rerender = true;
                     break;
                 case SDLK_RIGHT:
-                    graph.centery += graph.scale * 10.0f;
+                    graph.center.y += graph.scale * 10.0f;
                     rerender = true;
                     break;
                 // reset
@@ -213,7 +215,7 @@ int main(void)
 
         if (rerender) {
             rerender = false;
-            render_mandelbrot(renderer, colors, ncolors, &m, &graph);
+            render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
 
             // show
             SDL_RenderPresent(renderer);
