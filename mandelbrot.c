@@ -4,7 +4,6 @@
 #include <stdbool.h>
 
 #include <SDL.h>
-#include <SDL2_gfxPrimitives.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -20,7 +19,7 @@ void fatal(const char *fmt, ...)
     exit(EXIT_FAILURE);
 }
 
-bool approx(float a, float b)
+bool approxf(float a, float b)
 {
     return fabsf(a - b) < 1.0e-7;
 }
@@ -36,8 +35,7 @@ typedef struct Graph {
 
 void graph_init_default(Graph *g)
 {
-    g->center.x = 0.0f;
-    g->center.y = 0.0f;
+    g->center = (Point2D){.x = 0.0f, .y = 0.0f};
     g->scale = 1.0f / 400.0f;
 }
 
@@ -68,7 +66,7 @@ int mandelbrot_iterations(Point2D p0, int max_iterations, int max_periods)
 
         iterations += 1;
 
-        if (approx(x, old.x) && approx(y, old.y)) {
+        if (approxf(x, old.x) && approxf(y, old.y)) {
             iterations = max_iterations;
             break;
         }
@@ -101,7 +99,8 @@ void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, M
             int iterations = mandelbrot_iterations(p0, m->max_iterations, m->max_periods);
 
             SDL_Color c = colors[iterations % ncolors];
-            pixelRGBA(renderer, px, py, c.r, c.g, c.b, 0xff);
+            SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 0xff);
+            SDL_RenderDrawPoint(renderer, px, py);
         }
     }
 }
