@@ -130,6 +130,72 @@ void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, M
     }
 }
 
+typedef struct RunContext {
+    bool running;
+    Graph *graph;
+} RunContext;
+
+
+bool process_events(RunContext *c)
+{
+    bool rerender = false;
+    SDL_Event event;
+    // process events
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                c->running = false;
+                break;
+            case SDL_KEYUP:
+                switch (event.key.keysym.sym) {
+                    case SDLK_q:
+                        c->running = false;
+                        break;
+                    // scaling
+                    case SDLK_EQUALS:
+                        if (event.key.keysym.mod & KMOD_SHIFT) {
+                            Graph_zoom(c->graph, 0.9f);
+                            rerender = true;
+                        }
+                        break;
+                    case SDLK_MINUS:
+                        Graph_zoom(c->graph, 10.0f / 9.0f);
+                        rerender = true;
+                        break;
+                    // moving
+                    case SDLK_UP:
+                        Graph_pan_up(c->graph, 10.0f);
+                        rerender = true;
+                        break;
+                    case SDLK_DOWN:
+                        Graph_pan_down(c->graph, 10.0f);
+                        rerender = true;
+                        break;
+                    case SDLK_LEFT:
+                        Graph_pan_left(c->graph, 10.0f);
+                        rerender = true;
+                        break;
+                    case SDLK_RIGHT:
+                        Graph_pan_right(c->graph, 10.0f);
+                        rerender = true;
+                        break;
+                    // reset
+                    case SDLK_r:
+                        Graph_init_default(c->graph);
+                        rerender = true;
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    return rerender;
+}
+
 int main(void)
 {
     int width = 700, height = 400;
@@ -180,63 +246,12 @@ int main(void)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
     SDL_RenderClear(renderer);
 
-    SDL_Event event;
-    bool running = true;
-    bool rerender = true;
-    while (running) {
-        // process events
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-            case SDL_QUIT:
-                running = false;
-                break;
-            case SDL_KEYUP:
-                switch (event.key.keysym.sym) {
-                case SDLK_q:
-                    running = false;
-                    break;
-                // scaling
-                case SDLK_EQUALS:
-                    if (event.key.keysym.mod & KMOD_SHIFT) {
-                        Graph_zoom(&graph, 0.9f);
-                        rerender = true;
-                    }
-                    break;
-                case SDLK_MINUS:
-                    Graph_zoom(&graph, 10.0f / 9.0f);
-                    rerender = true;
-                    break;
-                // moving
-                case SDLK_UP:
-                    Graph_pan_up(&graph, 10.0f);
-                    rerender = true;
-                    break;
-                case SDLK_DOWN:
-                    Graph_pan_down(&graph, 10.0f);
-                    rerender = true;
-                    break;
-                case SDLK_LEFT:
-                    Graph_pan_left(&graph, 10.0f);
-                    rerender = true;
-                    break;
-                case SDLK_RIGHT:
-                    Graph_pan_right(&graph, 10.0f);
-                    rerender = true;
-                    break;
-                // reset
-                case SDLK_r:
-                    Graph_init_default(&graph);
-                    rerender = true;
-                    break;
-                default:
-                    break;
-                }
-                break;
-            default:
-                break;
-            }
-        }
+    // first render
+    render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
 
+    RunContext ctx = {.running = true, .graph = &graph};
+    while (ctx.running) {
+        bool rerender = process_events(&ctx);
         if (rerender) {
             rerender = false;
             render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
