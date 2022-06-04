@@ -33,10 +33,35 @@ typedef struct Graph {
     float scale; // TODO: add different xscale and yscale for resize events
 } Graph;
 
-void graph_init_default(Graph *g)
+void Graph_init_default(Graph *g)
 {
     g->center = (Point2D){.x = 0.0f, .y = 0.0f};
     g->scale = 1.0f / 400.0f;
+}
+
+void Graph_pan_right(Graph *g, float amt)
+{
+    g->center.x += g->scale * amt;
+}
+
+void Graph_pan_left(Graph *g, float amt)
+{
+    g->center.x -= g->scale * amt;
+}
+
+void Graph_pan_up(Graph *g, float amt)
+{
+    g->center.y += g->scale * amt;
+}
+
+void Graph_pan_down(Graph *g, float amt)
+{
+    g->center.y -= g->scale * amt;
+}
+
+void Graph_zoom(Graph *g, float amt)
+{
+    g->scale *= amt;
 }
 
 typedef struct Mandelbrot {
@@ -44,7 +69,7 @@ typedef struct Mandelbrot {
     int max_periods;
 } Mandelbrot;
 
-void mandelbrot_init_default(Mandelbrot *m)
+void Mandelbrot_init_default(Mandelbrot *m)
 {
     m->max_iterations = 1000;
     m->max_periods = 20;
@@ -146,10 +171,10 @@ int main(void)
                           {106, 52, 3, 255}};
 
     Mandelbrot m;
-    mandelbrot_init_default(&m);
+    Mandelbrot_init_default(&m);
 
     Graph graph;
-    graph_init_default(&graph);
+    Graph_init_default(&graph);
 
     // clear the screen
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
@@ -173,34 +198,34 @@ int main(void)
                 // scaling
                 case SDLK_EQUALS:
                     if (event.key.keysym.mod & KMOD_SHIFT) {
-                        graph.scale *= 0.9f;
+                        Graph_zoom(&graph, 0.9f);
                         rerender = true;
                     }
                     break;
                 case SDLK_MINUS:
-                    graph.scale *= 10.0f / 9.0f;
+                    Graph_zoom(&graph, 10.0f / 9.0f);
                     rerender = true;
                     break;
                 // moving
                 case SDLK_UP:
-                    graph.center.y += graph.scale * 10.0f;
+                    Graph_pan_up(&graph, 10.0f);
                     rerender = true;
                     break;
                 case SDLK_DOWN:
-                    graph.center.y -= graph.scale * 10.0f;
+                    Graph_pan_down(&graph, 10.0f);
                     rerender = true;
                     break;
                 case SDLK_LEFT:
-                    graph.center.x -= graph.scale * 10.0f;
+                    Graph_pan_left(&graph, 10.0f);
                     rerender = true;
                     break;
                 case SDLK_RIGHT:
-                    graph.center.y += graph.scale * 10.0f;
+                    Graph_pan_right(&graph, 10.0f);
                     rerender = true;
                     break;
                 // reset
                 case SDLK_r:
-                    graph_init_default(&graph);
+                    Graph_init_default(&graph);
                     rerender = true;
                     break;
                 default:
