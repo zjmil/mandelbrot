@@ -200,7 +200,7 @@ int main(void)
 {
     int width = 700, height = 400;
 
-    if (SDL_Init(SDL_INIT_VIDEO)) {
+    if (SDL_Init(SDL_INIT_EVERYTHING)) {
         fatal("Failed initializing SDL: %s\n", SDL_GetError());
     }
 
@@ -242,23 +242,42 @@ int main(void)
     Graph graph;
     Graph_init_default(&graph);
 
-    // clear the screen
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
-    SDL_RenderClear(renderer);
-
-    // first render
-    render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
 
     RunContext ctx = {.running = true, .graph = &graph};
+    uint32_t total_frames = 0;
+    uint32_t total_frame_ticks = 0;
     while (ctx.running) {
-        bool rerender = process_events(&ctx);
-        if (rerender) {
-            rerender = false;
-            render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
+        // Frame start
+        total_frames += 1;
+        uint32_t start_ticks = SDL_GetTicks();
+        uint64_t start_perf = SDL_GetPerformanceCounter();
 
-            // show
-            SDL_RenderPresent(renderer);
-        }
+        // Clear the screen
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xff);
+        SDL_RenderClear(renderer);
+
+        process_events(&ctx);
+
+        // Render
+        render_mandelbrot(renderer, colors, ARRAY_SIZE(colors), &m, &graph);
+
+        // Frame end
+        uint32_t end_ticks = SDL_GetTicks();
+        uint64_t end_perf = SDL_GetPerformanceCounter();
+        uint32_t frame_ticks = end_ticks - start_ticks;
+        uint64_t frame_perf = end_perf - start_perf;
+
+        total_frame_ticks += frame_ticks;
+        float frame_time = (float)frame_ticks / 1000.0f;
+
+        float fps = 1.0f / frame_time;
+        float average_fps = 1000.0f / ((float)total_frame_ticks / (float)total_frames);
+
+        // Render FPS
+        printf("FPS: %.2f, AVG FPS: %.2f, Perf: %llu\r", fps, average_fps, frame_perf);
+
+        // Show
+        SDL_RenderPresent(renderer);
     }
 
     SDL_DestroyRenderer(renderer);
