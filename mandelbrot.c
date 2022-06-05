@@ -75,7 +75,7 @@ void Mandelbrot_init_default(Mandelbrot *m)
     m->max_periods = 20;
 }
 
-int mandelbrot_iterations(Point2D p0, int max_iterations, int max_periods)
+int mandelbrot_point_iterations(float x0, float y0, int max_iterations, int max_periods)
 {
     float x = 0.0f, y = 0.0f, x2 = 0.0f, y2 = 0.0f;
     int iterations = 0;
@@ -84,8 +84,8 @@ int mandelbrot_iterations(Point2D p0, int max_iterations, int max_periods)
     int period = 0;
 
     while ((x2 + y2) <= 4.0 && iterations < max_iterations) {
-        y = 2*x*y + p0.y;
-        x = x2 - y2 + p0.x;
+        y = 2*x*y + y0;
+        x = x2 - y2 + x0;
         x2 = x*x;
         y2 = y*y;
 
@@ -106,35 +106,53 @@ int mandelbrot_iterations(Point2D p0, int max_iterations, int max_periods)
     return iterations;
 }
 
+void mandelbrot_iterations(int *iterations, int width, int height, Mandelbrot *m, Graph *g)
+{
+    float tx = g->center.x - (g->scale * width) / 2.0f;
+    float ty = g->center.y + (g->scale * height) / 2.0f;
+
+    for (int py = 0; py < height; py++) {
+        float y0 = ty - g->scale * py;
+
+        for (int px = 0; px < width; px++) {
+            float x0 = tx + g->scale * px;
+
+            int iters = mandelbrot_point_iterations(x0, y0, m->max_iterations, m->max_periods);
+
+            int idx = py * width + px;
+            iterations[idx] = iters;
+        }
+    }
+}
+
 void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, Mandelbrot *m, Graph *g)
 {
     int width = 0, height = 0;
     SDL_GetRendererOutputSize(renderer, &width, &height);
 
-    float tx = g->center.x - (g->scale * width) / 2.0f;
-    float ty = g->center.y + (g->scale * height) / 2.0f;
+    // TODO: no need to allocate this every render
+    int *iterations = malloc(sizeof(int) * width * height);
 
-    Point2D p0;
+    mandelbrot_iterations(iterations, width, height, m, g);
+
     for (int py = 0; py < height; py++) {
-        p0.y = ty - g->scale * py;
-
         for (int px = 0; px < width; px++) {
-            p0.x = tx + g->scale * px;
+            int idx = py * width + px;
+            int iters = iterations[idx];
 
-            int iterations = mandelbrot_iterations(p0, m->max_iterations, m->max_periods);
-
-            SDL_Color c = colors[iterations % ncolors];
+            SDL_Color c = colors[iters % ncolors];
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 0xff);
             SDL_RenderDrawPoint(renderer, px, py);
         }
     }
+
+    free(iterations);
 }
 
 typedef struct RunContext {
     bool running;
     Graph *graph;
 } RunContext;
-
 
 bool process_events(RunContext *c)
 {
@@ -241,7 +259,6 @@ int main(void)
 
     Graph graph;
     Graph_init_default(&graph);
-
 
     RunContext ctx = {.running = true, .graph = &graph};
     uint32_t total_frames = 0;
