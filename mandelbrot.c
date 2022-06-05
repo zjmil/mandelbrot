@@ -1,7 +1,8 @@
 
-#include <stdlib.h>
+#include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include <SDL.h>
 
@@ -30,7 +31,7 @@ typedef struct Point2D {
 
 typedef struct Graph {
     Point2D center;
-    float scale; // TODO: add different xscale and yscale for resize events
+    float scale;  // TODO: add different xscale and yscale for resize events
 } Graph;
 
 void Graph_init_default(Graph *g)
@@ -67,12 +68,39 @@ void Graph_zoom(Graph *g, float amt)
 typedef struct Mandelbrot {
     int max_iterations;
     int max_periods;
+    int width, height;
+    int *iterations;
 } Mandelbrot;
 
-void Mandelbrot_init_default(Mandelbrot *m)
+void Mandelbrot_init_default(Mandelbrot *m, int width, int height)
 {
     m->max_iterations = 1000;
     m->max_periods = 20;
+    m->iterations = malloc(sizeof(int) * width * height);
+    m->width = width;
+    m->height = height;
+}
+
+int Mandelbrot_idx(Mandelbrot *m, int x, int y)
+{
+    assert(x < m->width);
+    assert(y < m->height);
+    return y * m->width + x;
+}
+
+void Mandelbrot_set_iterations(Mandelbrot *m, int x, int y, int iters)
+{
+    m->iterations[Mandelbrot_idx(m, x, y)] = iters;
+}
+
+int Mandelbrot_get_iterations(Mandelbrot *m, int x, int y)
+{
+    return m->iterations[Mandelbrot_idx(m, x, y)];
+}
+
+void Mandelbrot_free(Mandelbrot *m)
+{
+    free(m->iterations);
 }
 
 int mandelbrot_point_iterations(float x0, float y0, int max_iterations, int max_periods)
@@ -80,18 +108,18 @@ int mandelbrot_point_iterations(float x0, float y0, int max_iterations, int max_
     float x = 0.0f, y = 0.0f, x2 = 0.0f, y2 = 0.0f;
     int iterations = 0;
 
-    Point2D old = {.x = 0.0f, .y = 0.0f};
+    float oldx = 0.0f, oldy = 0.0f;
     int period = 0;
 
     while ((x2 + y2) <= 4.0 && iterations < max_iterations) {
-        y = 2*x*y + y0;
+        y = 2 * x * y + y0;
         x = x2 - y2 + x0;
-        x2 = x*x;
-        y2 = y*y;
+        x2 = x * x;
+        y2 = y * y;
 
         iterations += 1;
 
-        if (approxf(x, old.x) && approxf(y, old.y)) {
+        if (approxf(x, oldx) && approxf(y, oldy)) {
             iterations = max_iterations;
             break;
         }
@@ -99,30 +127,74 @@ int mandelbrot_point_iterations(float x0, float y0, int max_iterations, int max_
         period += 1;
         if (period > max_periods) {
             period = 0;
-            old = (Point2D){.x = x, .y = y};
+            oldx = x;
+            oldy = y;
         }
     }
 
     return iterations;
 }
 
-void mandelbrot_iterations(int *iterations, int width, int height, Mandelbrot *m, Graph *g)
+void mandelbrot_iterations_range(Mandelbrot *m, Graph *g, int startx, int starty, int endx, int endy)
 {
-    float tx = g->center.x - (g->scale * width) / 2.0f;
-    float ty = g->center.y + (g->scale * height) / 2.0f;
+    float tx = g->center.x - (g->scale * m->width) / 2.0f;
+    float ty = g->center.y + (g->scale * m->height) / 2.0f;
 
-    for (int py = 0; py < height; py++) {
+    for (int py = starty; py < endy; py++) {
         float y0 = ty - g->scale * py;
 
-        for (int px = 0; px < width; px++) {
+        for (int px = startx; px < endx; px++) {
             float x0 = tx + g->scale * px;
 
             int iters = mandelbrot_point_iterations(x0, y0, m->max_iterations, m->max_periods);
 
-            int idx = py * width + px;
-            iterations[idx] = iters;
+            Mandelbrot_set_iterations(m, px, py, iters);
         }
     }
+}
+
+typedef struct MandelbrotThreadContext {
+    Mandelbrot *m;
+    Graph *g;
+    int startx, starty;
+    int endx, endy;
+} MandelbrotThreadContext;
+
+int mandelbrot_iterations_thread(void *ptr)
+{
+    MandelbrotThreadContext *c = ptr;
+    mandelbrot_iterations_range(c->m, c->g, c->startx, c->starty, c->endx, c->endy);
+    return 0;
+}
+
+void mandelbrot_iterations(Mandelbrot *m, Graph *g, int nthreads)
+{
+    if (nthreads <= 0) {
+        mandelbrot_iterations_range(m, g, 0, 0, m->width, m->height);
+        return;
+    }
+
+    SDL_Thread **threads = malloc(sizeof(SDL_Thread *) * nthreads);
+    MandelbrotThreadContext *thread_contexts = malloc(sizeof(MandelbrotThreadContext) * nthreads);
+
+    int rows_per_thread = m->height / nthreads;
+    for (int i = 0; i < nthreads; i++) {
+        // iterations data is structured like [row1][row2][row3][row4]....
+        // so we will just split on the y-axis, any extra we will append to the last thread
+        int starty = i * rows_per_thread;
+        int endy = (i == nthreads - 1) ? m->height : starty + rows_per_thread;
+
+        thread_contexts[i] =
+            (MandelbrotThreadContext){.m = m, .g = g, .startx = 0, .endx = m->width, .starty = starty, .endy = endy};
+        threads[i] = SDL_CreateThread(mandelbrot_iterations_thread, "MandelbrotIterationsThread", &thread_contexts[i]);
+    }
+
+    for (int i = 0; i < nthreads; i++) {
+        SDL_WaitThread(threads[i], NULL);
+    }
+
+    free(threads);
+    free(thread_contexts);
 }
 
 void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, Mandelbrot *m, Graph *g)
@@ -130,23 +202,19 @@ void render_mandelbrot(SDL_Renderer *renderer, SDL_Color *colors, int ncolors, M
     int width = 0, height = 0;
     SDL_GetRendererOutputSize(renderer, &width, &height);
 
-    // TODO: no need to allocate this every render
-    int *iterations = malloc(sizeof(int) * width * height);
+    int nthreads = 16;
+    mandelbrot_iterations(m, g, nthreads);
 
-    mandelbrot_iterations(iterations, width, height, m, g);
-
+    // Assign iterations to colors
     for (int py = 0; py < height; py++) {
         for (int px = 0; px < width; px++) {
-            int idx = py * width + px;
-            int iters = iterations[idx];
+            int iters = Mandelbrot_get_iterations(m, px, py);
 
             SDL_Color c = colors[iters % ncolors];
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 0xff);
             SDL_RenderDrawPoint(renderer, px, py);
         }
     }
-
-    free(iterations);
 }
 
 typedef struct RunContext {
@@ -222,12 +290,8 @@ int main(void)
         fatal("Failed initializing SDL: %s\n", SDL_GetError());
     }
 
-    SDL_Window *window = SDL_CreateWindow(
-            "Mandelbrot",
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            width, height,
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
-    );
+    SDL_Window *window = SDL_CreateWindow("Mandelbrot", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height,
+                                          SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window) {
         fatal("Failed to create window: %s", SDL_GetError());
     }
@@ -237,25 +301,15 @@ int main(void)
         fatal("Failed to create renderer: %s", SDL_GetError());
     }
 
-    SDL_Color colors[] = {{66, 30, 15, 255},
-                          {25, 7, 26, 255},
-                          {9, 1, 47, 255},
-                          {4, 4, 73, 255},
-                          {0, 7, 100, 255},
-                          {12, 44, 138, 255},
-                          {24, 82, 177, 255},
-                          {57, 125, 209, 255},
-                          {134, 181, 229, 255},
-                          {211, 236, 248, 255},
-                          {241, 233, 191, 255},
-                          {248, 201, 95, 255},
-                          {255, 170, 0, 255},
-                          {204, 128, 0, 255},
-                          {153, 87, 0, 255},
-                          {106, 52, 3, 255}};
+    SDL_Color colors[] = {{66, 30, 15, 255},    {25, 7, 26, 255},     {9, 1, 47, 255},      {4, 4, 73, 255},
+                          {0, 7, 100, 255},     {12, 44, 138, 255},   {24, 82, 177, 255},   {57, 125, 209, 255},
+                          {134, 181, 229, 255}, {211, 236, 248, 255}, {241, 233, 191, 255}, {248, 201, 95, 255},
+                          {255, 170, 0, 255},   {204, 128, 0, 255},   {153, 87, 0, 255},    {106, 52, 3, 255}};
 
+    // TODO: handle resize
+    SDL_GetRendererOutputSize(renderer, &width, &height);  // runs at 2x on mac, need to get correct sizes
     Mandelbrot m;
-    Mandelbrot_init_default(&m);
+    Mandelbrot_init_default(&m, width, height);
 
     Graph graph;
     Graph_init_default(&graph);
@@ -296,6 +350,8 @@ int main(void)
         // Show
         SDL_RenderPresent(renderer);
     }
+
+    Mandelbrot_free(&m);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
